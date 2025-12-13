@@ -61,12 +61,14 @@ return [
         ],
 
         'bunny' => [
-            'driver' => 'sftp',
-            'host' => 'storage.bunnycdn.com',
-            'username' => env('BUNNY_STORAGE_ZONE'),
-            'password' => env('BUNNY_API_KEY'),
-            'port' => 22,
-            'root' => '/',
+            'driver'  => 'sftp',
+            'host'    => env('BUNNY_STORAGE_HOST', 'sg.storage.bunnycdn.com'),
+            'username'=> env('BUNNY_STORAGE_USERNAME', 'storage-movie-test'),
+            'password'=> env('BUNNY_STORAGE_PASSWORD'),
+            'port'    => 21,
+            'root'    => env('BUNNY_STORAGE_ROOT', '/'),
+            'passive' => true,
+            'ssl'     => false,   // change to true later if you want FTPS
             'timeout' => 30,
         ],
     ],

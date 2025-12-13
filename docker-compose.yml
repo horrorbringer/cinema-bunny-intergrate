@@ -6,6 +6,7 @@ services:
       context: .
       dockerfile: docker/app.Dockerfile
     container_name: cinema-app
+    user: "1000:1000"        # 👈 add this line
     restart: unless-stopped
     working_dir: /var/www/html
     volumes:
@@ -57,6 +58,7 @@ services:
       context: .
       dockerfile: docker/app.Dockerfile
     container_name: cinema-queue
+    user: "1000:1000"        # 👈 add this too
     restart: unless-stopped
     working_dir: /var/www/html
     command: php artisan queue:work --verbose --tries=3 --timeout=90

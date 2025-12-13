@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('title');
             $table->string('slug')->unique();
-            $table->string('cdn_path'); // path inside BunnyCDN
-            $table->timestamp('rental_expires_at')->nullable();
+            $table->string('cdn_path');              // file name/path in Bunny
+            $table->timestamp('rental_expires_at')->nullable(); // for your 7-day test
             $table->timestamps();
         });
     }

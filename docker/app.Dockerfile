@@ -9,5 +9,8 @@ RUN apt-get update && apt-get install -y \
 # Install Composer from official image
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# 👉 Add this line to load your custom limits
+COPY docker/php.ini /usr/local/etc/php/conf.d/custom.ini
+
 WORKDIR /var/www/html
 
