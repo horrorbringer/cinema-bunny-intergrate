@@ -31,6 +31,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/movies', [AdminController::class, 'movies'])->name('movies');
     Route::get('/movies/create', [AdminController::class, 'create'])->name('movies.create');
     Route::post('/movies', [AdminController::class, 'store'])->name('movies.store');
+    Route::get('/movies/{id}/upload-progress', [AdminController::class, 'uploadProgress'])->name('movies.upload-progress');
+    Route::get('/movies/{id}/upload-status', [AdminController::class, 'uploadStatus'])->name('movies.upload-status');
     Route::get('/movies/{id}/edit', [AdminController::class, 'edit'])->name('movies.edit');
     Route::match(['put', 'patch'], '/movies/{id}', [AdminController::class, 'update'])->name('movies.update');
     Route::post('/movies/{id}/add-quality', [AdminController::class, 'addQuality'])->name('movies.add-quality');

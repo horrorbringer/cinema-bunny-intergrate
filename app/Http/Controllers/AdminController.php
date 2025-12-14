@@ -116,7 +116,8 @@ class AdminController extends Controller
         // Queue the upload job (runs in background - NO TIMEOUT ISSUES!)
         UploadVideoToBunnyJob::dispatch($movie, $localVideoPath, $localThumbnailPath, $localPosterPath);
 
-        return redirect()->route('admin.movies')->with('success', 'Movie saved! Uploading to Bunny.net in background. Check back in a few minutes.');
+        // Redirect to progress page instead of movies list
+        return redirect()->route('admin.movies.upload-progress', $movie->id);
     }
 
     /**
@@ -403,5 +404,50 @@ class AdminController extends Controller
 
         return redirect()->route('admin.movies.edit', $movie->id)
             ->with('success', "{$quality} quality version removed.");
+    }
+
+    /**
+     * Show upload progress page
+     */
+    public function uploadProgress($id)
+    {
+        $movie = Movie::findOrFail($id);
+        return view('admin.movies.upload-progress', compact('movie'));
+    }
+
+    /**
+     * API endpoint to check upload status (for AJAX polling)
+     */
+    public function uploadStatus($id)
+    {
+        $movie = Movie::findOrFail($id);
+        
+        // Check upload status
+        $status = [
+            'movie_id' => $movie->id,
+            'title' => $movie->title,
+            'video_uploaded' => !empty($movie->cdn_path),
+            'thumbnail_uploaded' => !empty($movie->thumbnail),
+            'poster_uploaded' => !empty($movie->poster),
+        ];
+
+        // Calculate progress percentage
+        // Video is always required, thumbnail and poster are optional
+        // We consider upload complete when video is uploaded (main requirement)
+        $totalSteps = 3; // video, thumbnail, poster (even if optional, we show all 3)
+        $completedSteps = 0;
+        if ($status['video_uploaded']) $completedSteps++;
+        if ($status['thumbnail_uploaded']) $completedSteps++;
+        if ($status['poster_uploaded']) $completedSteps++;
+        
+        // Upload is complete when video is uploaded (main requirement)
+        // Thumbnail and poster are optional, so we don't require them for completion
+        $status['is_complete'] = $status['video_uploaded'];
+        
+        $status['progress'] = round(($completedSteps / $totalSteps) * 100);
+        $status['completed_steps'] = $completedSteps;
+        $status['total_steps'] = $totalSteps;
+
+        return response()->json($status);
     }
 }
