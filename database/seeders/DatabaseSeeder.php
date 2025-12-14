@@ -15,11 +15,23 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // Seed genres
+        $this->call(GenreSeeder::class);
 
+        // Create admin user
+        User::factory()->create([
+            'name' => 'Admin User',
+            'email' => 'admin@cinemabunny.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('admin123'),
+            'is_admin' => true,
+        ]);
+
+        // Create test user
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+            'is_admin' => false,
         ]);
     }
 }

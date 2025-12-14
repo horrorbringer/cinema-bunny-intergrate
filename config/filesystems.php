@@ -69,7 +69,7 @@ return [
             'root'    => env('BUNNY_STORAGE_ROOT', '/'),
             'passive' => true,
             'ssl'     => false,   // change to true later if you want FTPS
-            'timeout' => 30,
+            'timeout' => 3600,    // 1 hour timeout for large file uploads
         ],
     ],
 

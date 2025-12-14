@@ -6,11 +6,16 @@ services:
       context: .
       dockerfile: docker/app.Dockerfile
     container_name: cinema-app
-    user: "1000:1000"        # 👈 add this line
+    user: "1000:1000"
     restart: unless-stopped
     working_dir: /var/www/html
     volumes:
       - ./:/var/www/html
+    environment:
+      - PHP_FPM_PM_MAX_CHILDREN=50
+      - PHP_FPM_PM_START_SERVERS=10
+      - PHP_FPM_PM_MIN_SPARE_SERVERS=5
+      - PHP_FPM_PM_MAX_SPARE_SERVERS=20
     networks:
       - cinema_net
 
@@ -58,10 +63,31 @@ services:
       context: .
       dockerfile: docker/app.Dockerfile
     container_name: cinema-queue
-    user: "1000:1000"        # 👈 add this too
+    user: "1000:1000"
     restart: unless-stopped
     working_dir: /var/www/html
-    command: php artisan queue:work --verbose --tries=3 --timeout=90
+    command: php artisan queue:work --verbose --tries=3 --timeout=3600
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - db
+      - redis
+    networks:
+      - cinema_net
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: cinema-scheduler
+    user: "1000:1000"
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: >
+      sh -c "while true; do
+        php artisan schedule:run --verbose --no-interaction &
+        sleep 60
+      done"
     volumes:
       - ./:/var/www/html
     depends_on:
