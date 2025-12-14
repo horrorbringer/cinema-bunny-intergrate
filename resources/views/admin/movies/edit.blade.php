@@ -119,6 +119,17 @@
     <div style="background: rgba(255, 255, 255, 0.05); padding: 40px; border-radius: 8px; margin-top: 40px;">
         <h2 style="font-size: 24px; margin-bottom: 20px;">📹 Video Quality Versions</h2>
         
+        <!-- Storage Cost Warning -->
+        <div style="background: rgba(255, 193, 7, 0.2); border-left: 4px solid #ffc107; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+            <strong style="color: #ffc107;">💰 Storage Cost Warning:</strong>
+            <p style="margin: 10px 0 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px;">
+                Each quality version uses additional storage (~1-2GB per quality). 
+                <strong>Recommendation:</strong> Only add multiple qualities for popular/featured movies to save storage costs.
+                <br>
+                <small style="color: rgba(255, 255, 255, 0.7);">💡 Tip: You can remove unused qualities anytime to free up storage.</small>
+            </p>
+        </div>
+        
         <!-- Current Qualities -->
         @php
             $qualities = $movie->video_qualities ?? [];
@@ -162,7 +173,11 @@
                         <option value="360p" {{ in_array('360p', array_keys($qualities)) ? 'disabled' : '' }}>360p</option>
                         <option value="240p" {{ in_array('240p', array_keys($qualities)) ? 'disabled' : '' }}>240p</option>
                     </select>
-                    <small style="color: rgba(255, 255, 255, 0.6); display: block; margin-top: 5px;">💡 Tip: Use HandBrake (free) to create lower quality versions from your 1080p video</small>
+                    <small style="color: rgba(255, 255, 255, 0.6); display: block; margin-top: 5px;">
+                        💡 Tip: Use HandBrake (free) to create lower quality versions from your 1080p video
+                        <br>
+                        ⚠️ Each quality adds ~1-2GB storage = $0.01-0.02/month
+                    </small>
                 </div>
 
                 <div class="form-group">

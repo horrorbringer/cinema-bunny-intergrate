@@ -250,9 +250,104 @@ class AdminController extends Controller
     public function destroy($id)
     {
         $movie = Movie::findOrFail($id);
-        $movie->delete();
+        $bunnyService = new \App\Services\BunnyStorageService();
+        $deletedFiles = [];
+        $errors = [];
 
-        return redirect()->route('admin.movies')->with('success', 'Movie deleted successfully!');
+        try {
+            // Delete main video file
+            if ($movie->cdn_path) {
+                try {
+                    if ($bunnyService->deleteFile($movie->cdn_path)) {
+                        $deletedFiles[] = "Video: {$movie->cdn_path}";
+                    } else {
+                        $errors[] = "Failed to delete video: {$movie->cdn_path}";
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Error deleting video: " . $e->getMessage();
+                }
+            }
+
+            // Delete thumbnail
+            if ($movie->thumbnail) {
+                try {
+                    if ($bunnyService->deleteFile($movie->thumbnail)) {
+                        $deletedFiles[] = "Thumbnail: {$movie->thumbnail}";
+                    } else {
+                        $errors[] = "Failed to delete thumbnail: {$movie->thumbnail}";
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Error deleting thumbnail: " . $e->getMessage();
+                }
+            }
+
+            // Delete poster
+            if ($movie->poster) {
+                try {
+                    if ($bunnyService->deleteFile($movie->poster)) {
+                        $deletedFiles[] = "Poster: {$movie->poster}";
+                    } else {
+                        $errors[] = "Failed to delete poster: {$movie->poster}";
+                    }
+                } catch (\Exception $e) {
+                    $errors[] = "Error deleting poster: " . $e->getMessage();
+                }
+            }
+
+            // Delete all quality versions
+            if ($movie->video_qualities && is_array($movie->video_qualities)) {
+                foreach ($movie->video_qualities as $quality => $path) {
+                    try {
+                        if ($bunnyService->deleteFile($path)) {
+                            $deletedFiles[] = "Quality {$quality}: {$path}";
+                        } else {
+                            $errors[] = "Failed to delete quality {$quality}: {$path}";
+                        }
+                    } catch (\Exception $e) {
+                        $errors[] = "Error deleting quality {$quality}: " . $e->getMessage();
+                    }
+                }
+            }
+
+            // Delete local files if they exist
+            if ($movie->cdn_path) {
+                $localVideoPath = 'uploads/videos/' . basename($movie->cdn_path);
+                if (Storage::disk('local')->exists($localVideoPath)) {
+                    Storage::disk('local')->delete($localVideoPath);
+                }
+            }
+
+            if ($movie->thumbnail) {
+                $localThumbnailPath = 'uploads/thumbnails/' . basename($movie->thumbnail);
+                if (Storage::disk('local')->exists($localThumbnailPath)) {
+                    Storage::disk('local')->delete($localThumbnailPath);
+                }
+            }
+
+            if ($movie->poster) {
+                $localPosterPath = 'uploads/posters/' . basename($movie->poster);
+                if (Storage::disk('local')->exists($localPosterPath)) {
+                    Storage::disk('local')->delete($localPosterPath);
+                }
+            }
+
+            // Delete database record
+            $movie->delete();
+
+            // Prepare success message
+            $message = 'Movie deleted successfully!';
+            if (!empty($deletedFiles)) {
+                $message .= ' Deleted ' . count($deletedFiles) . ' file(s) from Bunny.net.';
+            }
+            if (!empty($errors)) {
+                $message .= ' Some files could not be deleted: ' . implode(', ', $errors);
+            }
+
+            return redirect()->route('admin.movies')->with('success', $message);
+        } catch (\Exception $e) {
+            \Log::error('Movie deletion error: ' . $e->getMessage());
+            return redirect()->route('admin.movies')->with('error', 'Error deleting movie: ' . $e->getMessage());
+        }
     }
 
     /**

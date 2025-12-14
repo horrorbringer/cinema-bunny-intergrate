@@ -99,21 +99,23 @@ class MovieController extends Controller
         // Get available qualities
         $availableQualities = $movie->getAvailableQualities();
         
-        // Get default URL (first quality or main cdn_path)
-        $bunnyDomain = env('BUNNY_CDN_DOMAIN', env('BUNNY_STORAGE_HOST', 'sg.storage.bunnycdn.com'));
-        $cdnPath = $movie->cdn_path;
+        // Get default URL (first quality from list, which is highest quality)
+        $url = !empty($availableQualities) ? reset($availableQualities) : null;
         
-        // Generate default CDN URL
-        if (str_contains($bunnyDomain, 'b-cdn.net') || str_contains($bunnyDomain, 'bunnycdn.com')) {
-            $url = "https://{$bunnyDomain}/{$cdnPath}";
-        } else {
-            $url = "https://{$bunnyDomain}/" . env('BUNNY_STORAGE_USERNAME', 'storage-movie-test') . "/{$cdnPath}";
+        // Fallback to cdn_path if no qualities available
+        if (!$url && $movie->cdn_path) {
+            $bunnyDomain = env('BUNNY_CDN_DOMAIN', env('BUNNY_STORAGE_HOST', 'sg.storage.bunnycdn.com'));
+            if (str_contains($bunnyDomain, 'b-cdn.net') || str_contains($bunnyDomain, 'bunnycdn.com')) {
+                $url = "https://{$bunnyDomain}/{$movie->cdn_path}";
+            } else {
+                $url = "https://{$bunnyDomain}/" . env('BUNNY_STORAGE_USERNAME', 'storage-movie-test') . "/{$movie->cdn_path}";
+            }
         }
         
         // Optional: Add signed URL token for security
         $token = env('BUNNY_API_KEY', '');
-        if ($token) {
-            $expires = time() + 3600;
+        $expires = time() + 3600;
+        if ($token && $url) {
             $url .= "?token={$token}:{$expires}";
         }
 

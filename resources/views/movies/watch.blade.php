@@ -120,6 +120,16 @@
         display: block;
     }
 
+    .quality-info.switching {
+        background: rgba(229, 9, 20, 0.8);
+        animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
     .quality-badge {
         display: inline-block;
         background: #e50914;
@@ -248,7 +258,10 @@
             <div class="quality-menu" id="qualityMenu" style="display: none;">
                 @foreach($qualityUrls as $quality => $qualityUrl)
                     <button class="quality-option" data-quality="{{ $quality }}" data-url="{{ $qualityUrl }}">
-                        {{ $quality === 'auto' ? 'Auto (1080p)' : strtoupper($quality) }}
+                        {{ strtoupper($quality) }}
+                        @if($quality === '1080p')
+                            <span style="font-size: 11px; opacity: 0.7; margin-left: 5px;">(Best)</span>
+                        @endif
                     </button>
                 @endforeach
             </div>
@@ -307,7 +320,7 @@
     
     // Update current quality display
     function updateQualityDisplay() {
-        const qualityLabel = currentQuality === 'auto' ? 'Auto (1080p)' : currentQuality.toUpperCase();
+        const qualityLabel = currentQuality.toUpperCase();
         currentQualitySpan.textContent = qualityLabel;
         
         // Update active state in menu
@@ -322,23 +335,57 @@
     
     // Switch quality
     function switchQuality(quality, url) {
+        if (currentQuality === quality) {
+            qualityMenu.style.display = 'none';
+            return; // Already on this quality
+        }
+        
         const wasPlaying = !video.paused;
         const currentTime = video.currentTime;
+        const currentVolume = video.volume;
+        const wasMuted = video.muted;
+        
+        // Show loading indicator
+        const qualityInfo = document.getElementById('qualityInfo');
+        const qualityText = document.getElementById('qualityText');
+        qualityText.textContent = 'Switching quality...';
+        qualityInfo.classList.add('active', 'switching');
+        
+        // Pause video during switch
+        video.pause();
         
         // Update video source
         video.src = url;
         video.load();
         
-        // Restore playback position
+        // Restore playback position and state
         video.addEventListener('loadedmetadata', function() {
-            video.currentTime = currentTime;
+            video.currentTime = Math.min(currentTime, video.duration);
+            video.volume = currentVolume;
+            video.muted = wasMuted;
+            
             if (wasPlaying) {
-                video.play();
+                video.play().catch(err => {
+                    console.log('Auto-play prevented:', err);
+                });
             }
+            
+            // Update quality display
+            currentQuality = quality;
+            updateQualityDisplay();
+            detectVideoQuality(); // Update quality info
+            
+            // Remove switching indicator
+            qualityInfo.classList.remove('switching');
         }, { once: true });
         
-        currentQuality = quality;
-        updateQualityDisplay();
+        // Handle errors
+        video.addEventListener('error', function() {
+            qualityText.textContent = 'Error loading quality';
+            qualityInfo.classList.remove('switching');
+            console.error('Error loading video quality:', quality);
+        }, { once: true });
+        
         qualityMenu.style.display = 'none';
     }
     
@@ -566,6 +613,17 @@
                 e.preventDefault();
                 video.muted = !video.muted;
                 break;
+            @if(isset($qualityUrls) && count($qualityUrls) > 1)
+            case 'KeyQ':
+                e.preventDefault();
+                // Toggle quality menu
+                if (qualityMenu.style.display === 'none') {
+                    qualityMenu.style.display = 'block';
+                } else {
+                    qualityMenu.style.display = 'none';
+                }
+                break;
+            @endif
         }
     });
 </script>

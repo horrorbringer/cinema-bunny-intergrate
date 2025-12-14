@@ -40,6 +40,7 @@ class Movie extends Model
     /**
      * Get available video qualities
      * Returns array of quality => CDN URL
+     * Includes both video_qualities and default cdn_path
      */
     public function getAvailableQualities(): array
     {
@@ -47,25 +48,52 @@ class Movie extends Model
         $bunnyDomain = env('BUNNY_CDN_DOMAIN', env('BUNNY_STORAGE_HOST', 'sg.storage.bunnycdn.com'));
         $storageZone = env('BUNNY_STORAGE_USERNAME', 'storage-movie-test');
         
-        // If video_qualities exists, use it
+        // Add video_qualities if they exist
         if ($this->video_qualities && is_array($this->video_qualities)) {
             foreach ($this->video_qualities as $quality => $path) {
-                if (str_contains($bunnyDomain, 'b-cdn.net')) {
-                    $qualities[$quality] = "https://{$bunnyDomain}/{$path}";
-                } else {
-                    $qualities[$quality] = "https://{$bunnyDomain}/{$storageZone}/{$path}";
+                if ($path) { // Only add if path exists
+                    if (str_contains($bunnyDomain, 'b-cdn.net')) {
+                        $qualities[$quality] = "https://{$bunnyDomain}/{$path}";
+                    } else {
+                        $qualities[$quality] = "https://{$bunnyDomain}/{$storageZone}/{$path}";
+                    }
                 }
             }
         }
         
-        // Fallback to single cdn_path (backward compatible)
-        if (empty($qualities) && $this->cdn_path) {
-            if (str_contains($bunnyDomain, 'b-cdn.net')) {
-                $qualities['auto'] = "https://{$bunnyDomain}/{$this->cdn_path}";
-            } else {
-                $qualities['auto'] = "https://{$bunnyDomain}/{$storageZone}/{$this->cdn_path}";
+        // Always include default cdn_path as a quality option (if not already included)
+        // Try to detect quality from cdn_path or default to '1080p'
+        if ($this->cdn_path) {
+            $defaultQuality = '1080p'; // Default assumption
+            
+            // Try to detect quality from path or use '1080p' as default
+            if (str_contains($this->cdn_path, '1080p') || str_contains($this->cdn_path, '1080')) {
+                $defaultQuality = '1080p';
+            } elseif (str_contains($this->cdn_path, '720p') || str_contains($this->cdn_path, '720')) {
+                $defaultQuality = '720p';
+            } elseif (str_contains($this->cdn_path, '480p') || str_contains($this->cdn_path, '480')) {
+                $defaultQuality = '480p';
+            } elseif (str_contains($this->cdn_path, '360p') || str_contains($this->cdn_path, '360')) {
+                $defaultQuality = '360p';
+            }
+            
+            // Only add if this quality isn't already in the list
+            if (!isset($qualities[$defaultQuality])) {
+                if (str_contains($bunnyDomain, 'b-cdn.net')) {
+                    $qualities[$defaultQuality] = "https://{$bunnyDomain}/{$this->cdn_path}";
+                } else {
+                    $qualities[$defaultQuality] = "https://{$bunnyDomain}/{$storageZone}/{$this->cdn_path}";
+                }
             }
         }
+        
+        // Sort qualities from highest to lowest (1080p, 720p, 480p, 360p, 240p)
+        $qualityOrder = ['1080p' => 1, '720p' => 2, '480p' => 3, '360p' => 4, '240p' => 5];
+        uksort($qualities, function($a, $b) use ($qualityOrder) {
+            $orderA = $qualityOrder[$a] ?? 999;
+            $orderB = $qualityOrder[$b] ?? 999;
+            return $orderA <=> $orderB;
+        });
         
         return $qualities;
     }

@@ -75,6 +75,9 @@ class BunnyStorageService
             // Create a stream from the file handle
             $stream = \GuzzleHttp\Psr7\Utils::streamFor($fileHandle);
 
+            // Track upload time
+            $uploadStartTime = microtime(true);
+
             // Use Guzzle directly to avoid Laravel's JSON encoding
             $client = new \GuzzleHttp\Client(['timeout' => 3600]);
             $response = $client->request('PUT', $url, [
@@ -83,6 +86,13 @@ class BunnyStorageService
                 ],
                 'body' => $stream, // Stream is sent as raw binary
             ]);
+
+            // Calculate upload speed
+            $uploadEndTime = microtime(true);
+            $uploadDuration = $uploadEndTime - $uploadStartTime;
+            $uploadSpeedMbps = ($fileSize * 8) / ($uploadDuration * 1000000); // Convert to Mbps
+            $uploadSpeedMBps = $fileSize / ($uploadDuration * 1024 * 1024); // Convert to MB/s
+            $fileSizeMB = number_format($fileSize / 1024 / 1024, 2);
 
             // Close the file handle (stream will also close it, but be safe)
             if (is_resource($fileHandle)) {
@@ -94,7 +104,7 @@ class BunnyStorageService
 
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 200 && $statusCode < 300) {
-                Log::info("✅ File uploaded successfully via HTTP API: {$remoteName}");
+                Log::info("✅ File uploaded successfully via HTTP API: {$remoteName} ({$fileSizeMB} MB in " . number_format($uploadDuration, 2) . "s, " . number_format($uploadSpeedMBps, 2) . " MB/s)");
                 return true;
             } else {
                 $errorBody = $response->getBody()->getContents();
@@ -224,10 +234,35 @@ class BunnyStorageService
 
     /**
      * Delete file from Bunny.net
+     * Tries HTTP API first, falls back to SFTP if needed
      */
     public function deleteFile(string $fileName): bool
     {
+        // Try HTTP API first
+        try {
+            return $this->deleteFileViaHttp($fileName);
+        } catch (\Exception $httpError) {
+            // If HTTP API fails (e.g., 401 Unauthorized), fall back to SFTP
+            if (str_contains($httpError->getMessage(), '401') || str_contains($httpError->getMessage(), 'Unauthorized')) {
+                Log::warning("HTTP API delete failed (401 Unauthorized) - Falling back to SFTP...");
+                return $this->deleteFileViaSftp($fileName);
+            }
+            // Re-throw other errors
+            throw $httpError;
+        }
+    }
+
+    /**
+     * Delete file via HTTP API
+     * Note: Deletion is fast because it's just a DELETE request (no data transfer)
+     */
+    private function deleteFileViaHttp(string $fileName): bool
+    {
         $url = "https://{$this->host}/{$this->storageZone}/{$fileName}";
+        
+        Log::info("Deleting file from Bunny.net via HTTP API: {$fileName}");
+        
+        $deleteStartTime = microtime(true);
         
         $response = Http::timeout(30)
             ->withHeaders([
@@ -235,7 +270,40 @@ class BunnyStorageService
             ])
             ->delete($url);
 
-        return $response->successful();
+        $deleteDuration = microtime(true) - $deleteStartTime;
+
+        if ($response->successful()) {
+            Log::info("✅ File deleted successfully via HTTP API: {$fileName} (took " . number_format($deleteDuration, 2) . "s)");
+            return true;
+        } else {
+            $errorBody = $response->body();
+            Log::error("❌ HTTP API delete failed (Status: {$response->status()}): {$errorBody}");
+            throw new \Exception("Delete failed (HTTP {$response->status()}): {$errorBody}");
+        }
+    }
+
+    /**
+     * Delete file via SFTP (fallback method)
+     */
+    private function deleteFileViaSftp(string $fileName): bool
+    {
+        Log::info("Deleting file from Bunny.net via SFTP: {$fileName}");
+        
+        try {
+            $result = Storage::disk('bunny')->delete($fileName);
+            
+            if ($result) {
+                Log::info("✅ File deleted successfully via SFTP: {$fileName}");
+                return true;
+            } else {
+                Log::warning("⚠️ SFTP delete returned false (file may not exist): {$fileName}");
+                // Return true anyway - file might not exist, which is fine
+                return true;
+            }
+        } catch (\Exception $e) {
+            Log::error("SFTP delete error: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
 
